@@ -1,0 +1,93 @@
+! DB EMS script provides linear optimum start for all heated zones in a DesignBuilder model
+! Note the heating setpoint schedule name assumes the convention used by DB from v4.7 onwards
+! The code works for Simple HVAC and Detailed HVAC with Simple HVAC activity data set
+
+EnergyManagementSystem:GlobalVariable, CurrentOptimumStartTime;
+
+EnergyManagementSystem:ProgramCallingManager,
+   OptimumStartCM,
+   BeginTimestepBeforePredictor,
+   SetOptimumStart;
+
+EnergyManagementSystem:ProgramCallingManager,
+   InitConstants, 
+   BeginNewEnvironment, 
+   Init;
+
+EnergyManagementSystem:Program,
+   Init,
+   SET CurrentOptimumStartTime = 7;
+
+EnergyManagementSystem:Sensor,
+   SiteOutdoorAirDrybulbTemperature,
+   Environment,
+   Site Outdoor Air Drybulb Temperature;
+
+<ForAllOccupiedHeatedZones>
+EnergyManagementSystem:Actuator,
+   <LoopZoneVariableName>HeatingSetpointSchedule,
+   <LoopZoneIDFName> Heating Setpoint Schedule,
+   Schedule:Compact,
+   Schedule Value; 
+<LoopNextZone>
+
+! set optimimum start time
+EnergyManagementSystem:Program,
+   SetOptimumStart,
+   ! set the optimum start time at 1am
+   IF (CurrentTime == 1),
+      SET Tos = SiteOutdoorAirDrybulbTemperature,
+      ! outside temp for earliest start time
+      SET TosMin = 0,
+      ! earliest start time
+      SET TimeTosMin = 5,
+      ! outside temp for latest start time
+      SET TosMax = 10,   
+      ! latest start time
+      SET TimeTosMax = 7,
+      IF (Tos <= TosMin),
+         SET Time = TimeTosMin,
+      ELSEIF (Tos >= TosMax),
+         SET Time = TimeTosMax,
+      ELSE,
+         SET m = (TimeTosMax - TimeTosMin) / (TosMax - TosMin),      
+         SET C = (TimeTosMin + TimeTosMax - m * (TosMin + TosMax)) / 2,
+         SET Time = m * Tos + C,
+      ENDIF,
+      SET CurrentOptimumStartTime = Time,
+   ENDIF,
+
+! override heating setpoint schedule: setback until optimum startup time, setpoint until 10, setback until 16, setpoint until 23
+<ForAllOccupiedHeatedZones>
+   If (CurrentTime < CurrentOptimumStartTime),
+      SET <LoopZoneVariableName>HeatingSetpointSchedule = <LoopZoneAttribute HeatingSetBackSetPointTemperature>,
+   ELSEIF (CurrentTime < 10),
+      SET <LoopZoneVariableName>HeatingSetpointSchedule = <LoopZoneAttribute HeatingDesignSetPointTemperature>,
+   ELSEIF (CurrentTime < 16),
+      SET <LoopZoneVariableName>HeatingSetpointSchedule = <LoopZoneAttribute HeatingSetBackSetPointTemperature>,
+   ELSEIF (CurrentTime < 23),
+      SET <LoopZoneVariableName>HeatingSetpointSchedule = <LoopZoneAttribute HeatingDesignSetPointTemperature>,
+   ELSE,
+      SET <LoopZoneVariableName>HeatingSetpointSchedule = <LoopZoneAttribute HeatingSetBackSetPointTemperature>,
+   ENDIF,
+<LoopNextZone>
+;
+
+EnergyManagementSystem:OutputVariable,
+   Optimum Start Time, 
+   CurrentOptimumStartTime, 
+   Averaged, 
+   ZoneTimeStep ; 
+
+<If BuildingAttribute TimesteplyOutput = 1 Then> 
+Output:Variable,
+   *, 
+   Optimum Start Time, 
+   timestep; 
+<Endif>
+<If BuildingAttribute HourlyOutput = 1 Then> 
+Output:Variable,
+   *, 
+   Optimum Start Time, 
+   hourly; 
+<Endif>   
