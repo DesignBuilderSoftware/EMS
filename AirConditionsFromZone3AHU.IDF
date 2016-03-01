@@ -39,11 +39,6 @@ EnergyManagementSystem:Sensor,
    Environment,
    Site Outdoor Air Density;
 
-EnergyManagementSystem:Sensor,
-   Tos,
-   AIR LOOP AHU OUTDOOR AIR INLET,
-   System Node Temperature;
-
 ! makeup infiltration for the buffer zone. Equally this could be provided from an earth tube
 ZoneInfiltration:DesignFlowRate, 
    Block1:Zone1 Makeup Infiltration,           !- Name
