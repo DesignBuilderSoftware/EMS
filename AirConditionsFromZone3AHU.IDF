@@ -1,5 +1,6 @@
 ! Based on AirConditionsFromZone2AHU.txt by German Campos (https://github.com/DesignBuilderES/DB_EMS)
-!-This EMS program uses a buffer zone air conditions (Dry-bulb and Wetbulb) as AHU Outdoor air inlet air conditions. 
+
+! This EMS program uses a buffer zone air conditions (Dry-bulb and Wetbulb) as AHU Outdoor air inlet air conditions. 
 ! You can use it, for example, to simulate situations where outdoor air is taken from a zone such as a double-facade, trombe-wall, sun-space. 
 ! The code introduces outdoor air to the buffer zone to preserve thermal balance through infiltration.
 ! Change AIR LOOP AHU OUTDOOR AIR INLET to the corresponding node name for your system. If your air loop is called "DOAS" then 
