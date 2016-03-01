@@ -1,9 +1,7 @@
-! Based on AirConditionsFromZone2AHU.txt by German Campos (https://github.com/DesignBuilderES/DB_EMS), with thanks.
-
+! Based on AirConditionsFromZone2AHU.txt by German Campos (https://github.com/DesignBuilderES/DB_EMS)
 !-This EMS program uses a buffer zone air conditions (Dry-bulb and Wetbulb) as AHU Outdoor air inlet air conditions. 
-! You can use it, for example, to simulate situations where outdoor air is taken from a zone such as a double-facade, 
-! trombe-wall, sun-space. You also have to introduce outdoor air to the buffer zone to preserve thermal balance (e.g. through infiltration).
-
+! You can use it, for example, to simulate situations where outdoor air is taken from a zone such as a double-facade, trombe-wall, sun-space. 
+! The code introduces outdoor air to the buffer zone to preserve thermal balance through infiltration.
 ! Change AIR LOOP AHU OUTDOOR AIR INLET to the corresponding node name for your system. If your air loop is called "DOAS" then 
 ! the outdoor inlet node is called "DOAS AHU OUTDOOR AIR INLET". Likewise change Buffer:Zone for the buffer zone name (e.g. Block1:Zone1).
 
@@ -18,6 +16,13 @@ EnergyManagementSystem:Actuator,
    AIR LOOP AHU OUTDOOR AIR INLET,
    Outdoor Air System Node,
    Wetbulb Temperature;
+
+Output:Variable, *, Zone Infiltration Mass Flow Rate, Timestep;
+
+EnergyManagementSystem:Sensor,
+   System_Node_Mass_Flow_Rate,
+   Air Loop AHU Outdoor Air Inlet,
+   System Node Mass Flow Rate;
   
 EnergyManagementSystem:Sensor,
    BufferZoneMAT,
@@ -26,8 +31,47 @@ EnergyManagementSystem:Sensor,
 
 EnergyManagementSystem:Sensor,
    BufferZoneHR,
-   BufferZone,
+   Buffer:Zone,
    Zone Mean Air Humidity Ratio;
+
+EnergyManagementSystem:Sensor,
+   Outdoor_Air_Density,
+   Environment,
+   Site Outdoor Air Density;
+
+EnergyManagementSystem:Sensor,
+   Tos,
+   AIR LOOP AHU OUTDOOR AIR INLET,
+   System Node Temperature;
+
+! makeup infiltration for the buffer zone. Equally this could be provided from an earth tube
+ZoneInfiltration:DesignFlowRate, 
+   Block1:Zone1 Makeup Infiltration,           !- Name
+   Buffer:Zone,                                !- Zone Name
+   MakeupAirSchedule,                          !- Infiltration SCHEDULE Name
+   Flow/zone,                                  !- Design Volume Flow Rate calculation method
+   1,                                          !- Design Volume Flow Rate (m3/s)
+   ,                                           !- Flow per Zone Floor Area m3/s/m2
+   ,                                           !- Flow per Exterior Surface Area m3/s/m2
+   ,                                           !- Air Changes Per Hour
+   1,                                          !- Constant Term Coefficient
+   0,                                          !- Temperature Term Coefficient
+   0,                                          !- Velocity Term Coefficient
+   0;                                          !- Velocity Squared Term Coefficient
+
+Schedule:Compact, 
+   MakeupAirSchedule,                          ! Name
+   Any Number,                                 ! Type
+   Through: 12/31,                             ! Type
+   For: AllDays,                               ! All days in year
+   Until: 24:00,                               ! All hours in day
+   1;     
+
+EnergyManagementSystem:Actuator,
+   MakeupAirScheduleActuator,
+   MakeupAirSchedule,
+   Schedule:Compact,
+   Schedule Value;
 
 EnergyManagementSystem:ProgramCallingManager,
    ChangeAHUInletConditionsCall,
@@ -36,6 +80,10 @@ EnergyManagementSystem:ProgramCallingManager,
 
 EnergyManagementSystem:Program,
    ChangeAHUInletConditions,
+
+   ! set conditions at the AHU inlet to be the same as those in the buffer zone
    SET DBTempAHUInlet = BufferZoneMAT,
-   SET WBTempAHUInlet = @TwbFnTdbWPb BufferZoneMAT BufferZoneHR;
-   
+   SET WBTempAHUInlet = @TwbFnTdbWPb BufferZoneMAT BufferZoneHR,
+
+   ! set buffer zone makeup air rate to be the same as the AHU inlet
+   SET MakeupAirScheduleActuator = System_Node_Mass_Flow_Rate / Outdoor_Air_Density;
